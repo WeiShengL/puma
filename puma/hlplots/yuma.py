@@ -107,6 +107,7 @@ class YumaConfig:
             t["name"] = get_tagger_name(
                 t.get("name", None), t["sample_path"], key, results.flavours
             )
+            t["group"] = t.get('group', "")
 
             results.add(Tagger(**t))
 

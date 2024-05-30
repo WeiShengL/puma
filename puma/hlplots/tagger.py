@@ -26,7 +26,8 @@ class Tagger:
     fxs: dict[str, float] = field(default_factory=lambda: {"fc": 0.1, "fb": 0.2})
     aux_tasks: list = field(default_factory=lambda: list(get_aux_labels().keys()))
     sample_path: Path = None
-
+    group: str = ""
+    ghost: bool = False
     # this is only read by the Results class
     cuts: Cuts | list | None = None
 
@@ -73,6 +74,8 @@ class Tagger:
             Array of indices of the given flavour
         """
         flavour = Flavours[flavour]
+        print(flavour)
+        print(flavour.cuts)
         return flavour.cuts(self.labels).idx
 
     @property
@@ -156,6 +159,7 @@ class Tagger:
             self.scores = source[self.variables].to_records(index=False)
             return
         if source_type == "structured_array":
+            print(source.dtype.names)
             self.scores = source[self.variables]
             return
         if key is None:
@@ -226,6 +230,8 @@ class Tagger:
         np.ndarray
             Discriminant for given signal class
         """
+        if self.ghost:
+            signal = f"ghost{signal}"
         signal = Flavours[signal]
         if fxs is None:
             fxs = self.fxs

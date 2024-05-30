@@ -394,6 +394,12 @@ class RocPlot(PlotBase):
         rej_class : str
             Rejection class
         """
+        # if 'ghost' in rej_class:
+        #     rej_class = rej_class.replace('ghost', '')
+        if rej_class.name == 'ghostcjets':
+            rej_class = Flavours.cjets
+        if rej_class.name == 'ghostujets':
+            rej_class = Flavours.ujets      
         for key, elem in self.rocs.items():
             if elem.rej_class != rej_class:
                 continue

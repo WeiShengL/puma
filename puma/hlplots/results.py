@@ -118,6 +118,8 @@ class Results:
             tagger.colour = next(c for c in good_colours if c not in current_colours)
         if tagger.output_flavours is None:
             tagger.output_flavours = self.flavours
+        if tagger.ghost:
+            tagger.output_flavours = [Flavours.ghostujets, Flavours.ghostcjets, Flavours.ghostbjets]
         self.taggers[str(tagger)] = tagger
 
     def load(self):
@@ -126,11 +128,13 @@ class Results:
         tagger_paths = list({tagger.sample_path for tagger in req_load})
         for tp in tagger_paths:
             tp_taggers = [tagger for tagger in req_load if tagger.sample_path == tp]
+            group_list = [tagger.group for tagger in req_load if tagger.sample_path == tp]
             self.load_taggers_from_file(
                 tp_taggers,
                 tp,
                 cuts=self.global_cuts,
                 num_jets=self.num_jets,
+                group_list = group_list,
             )
 
     def load_taggers_from_file(  # pylint: disable=R0913
@@ -142,6 +146,7 @@ class Results:
         cuts: Cuts | list | None = None,
         num_jets: int | None = None,
         perf_vars: dict | None = None,
+        group_list: list | None = None,
     ):
         """Load one or more taggers from a common file. Adds the tagger to this results class
         if it is not already present.
@@ -193,48 +198,66 @@ class Results:
             if "ftau" in tagger.fxs:
                 tagger.output_flavours += [Flavours.taujets]
 
+            if tagger.ghost:
+                tagger.output_flavours = [Flavours.ghostujets, Flavours.ghostcjets, Flavours.ghosttaujets, Flavours.ghostbjets]
+
+            print(tagger.name)
+            print(tagger.output_flavours)
+            print(tagger.variables)
         # get a list of all variables to be loaded from the file
         if not isinstance(cuts, Cuts):
             cuts = Cuts.empty() if cuts is None else Cuts.from_list(cuts)
-        var_list = sum([tagger.variables for tagger in taggers], [label_var])
+        # var_list = sum([tagger.variables for tagger in taggers], [label_var])
+        print(tagger.variables)
+        temp_variables = [s+'jets' for s in tagger.variables]
+        print("Temp")
+        print(temp_variables)
+        var_list = sum([tagger.variables + [label_var] if not tagger.ghost else temp_variables + ['GhostTruthLabelID'] for tagger in taggers], [])
         var_list += cuts.variables
         var_list += sum([t.cuts.variables for t in taggers if t.cuts is not None], [])
         var_list = list(set(var_list + self.perf_vars))
 
         # load data
-        reader = H5Reader(file_path, precision="full")
-        data = reader.load({key: var_list}, num_jets)[key]
+        for group in group_list:
+            reader = H5Reader(file_path, precision="full", jets_name=f'{group}/jets')
+            key = group + '/jets'
+            data = reader.load({key: var_list}, num_jets)[key]
 
-        # check for nan values
-        data = check_nan(data)
-        # apply common cuts
-        if cuts:
-            idx, data = cuts(data)
-            if perf_vars is not None:
-                for perf_var_name, perf_var_array in perf_vars.items():
-                    perf_vars[perf_var_name] = perf_var_array[idx]
+            # check for nan values
+            data = check_nan(data)
+            # apply common cuts
+            if cuts:
+                idx, data = cuts(data)
+                if perf_vars is not None:
+                    for perf_var_name, perf_var_array in perf_vars.items():
+                        perf_vars[perf_var_name] = perf_var_array[idx]
 
-        # for each tagger
-        for tagger in taggers:
-            sel_data = data
-            sel_perf_vars = perf_vars
+            # for each tagger
+            for tagger in taggers:
+                sel_data = data
+                sel_perf_vars = perf_vars
 
-            # apply tagger specific cuts
-            if tagger.cuts:
-                idx, sel_data = tagger.cuts(data)
+                # apply tagger specific cuts
+                if tagger.cuts:
+                    idx, sel_data = tagger.cuts(data)
 
-            # attach data to tagger objects
-            tagger.extract_tagger_scores(sel_data, source_type="structured_array")
-            tagger.labels = np.array(sel_data[label_var], dtype=[(label_var, "i4")])
-            if perf_vars is None:
-                tagger.perf_vars = {}
-                for perf_var in self.perf_vars:
-                    if any(x in perf_var for x in ["pt", "mass"]):
-                        tagger.perf_vars[perf_var] = sel_data[perf_var] * 0.001
-                    else:
-                        tagger.perf_vars[perf_var] = sel_data[perf_var]
-            else:
-                tagger.perf_vars = sel_perf_vars
+                if tagger.ghost:
+                    label_var = 'GhostTruthLabelID'
+                    new_dtype_names = [name.replace('jets', '') for name in sel_data.dtype.names]
+                    sel_data.dtype.names = tuple(new_dtype_names)
+
+                # attach data to tagger objects
+                tagger.extract_tagger_scores(sel_data, source_type="structured_array")
+                tagger.labels = np.array(sel_data[label_var], dtype=[(label_var, "i4")])
+                if perf_vars is None:
+                    tagger.perf_vars = {}
+                    for perf_var in self.perf_vars:
+                        if any(x in perf_var for x in ["pt", "mass"]):
+                            tagger.perf_vars[perf_var] = sel_data[perf_var] * 0.001
+                        else:
+                            tagger.perf_vars[perf_var] = sel_data[perf_var]
+                else:
+                    tagger.perf_vars = sel_perf_vars
 
     def __getitem__(self, tagger_name: str):
         """Retrieve Tagger object.
@@ -416,14 +439,20 @@ class Results:
 
             wp_cuts, wp_labels = [], []
             # get working point
+            if tagger.ghost:
+                signal = f'ghost{self.signal}'
+                flavours = [Flavours.ghostujets, Flavours.ghostcjets, Flavours.ghostbjets]
+            else:
+                signal = self.signal
+                flavours = self.flavours
             for wp in wp_vlines:
-                cut = np.percentile(discs[tagger.is_flav(self.signal)], 100 - wp)
+                cut = np.percentile(discs[tagger.is_flav(signal)], 100 - wp)
                 label = None if i > 0 else f"{wp}%"
                 wp_cuts.append(cut)
                 wp_labels.append(label)
 
             hist.draw_vlines(wp_cuts, labels=wp_labels, linestyle=line_styles[i])
-            for flav in self.flavours:
+            for flav in flavours:
                 hist.add(
                     Histogram(
                         discs[tagger.is_flav(flav)],
@@ -479,10 +508,23 @@ class Results:
         roc = RocPlot(**roc_plot_args)
 
         for tagger in self.taggers.values():
+            print(tagger)
+            if tagger.ghost:
+                signal = f'ghost{self.signal}'
+                flavours = [Flavours.ghostujets, Flavours.ghostcjets, Flavours.ghostbjets]
+                if signal == 'ghostbjets':
+                    backgrounds = [Flavours.ghostcjets, Flavours.ghostujets]
+                elif signal == 'ghostcjets':
+                    backgrounds = [Flavours.ghostbjets, Flavours.ghostujets]
+
+            else:
+                signal = self.signal
+                flavours = self.flavours
+                backgrounds = self.backgrounds
             discs = tagger.discriminant(self.signal)
-            for background in self.backgrounds:
+            for background in backgrounds:
                 rej = calc_rej(
-                    discs[tagger.is_flav(self.signal)],
+                    discs[tagger.is_flav(signal)],
                     discs[tagger.is_flav(background)],
                     sig_effs,
                 )
@@ -500,7 +542,7 @@ class Results:
                 )
 
         # setting which flavour rejection ratio is drawn in which ratio panel
-        for i, background in enumerate(self.backgrounds):
+        for i, background in enumerate(backgrounds):
             roc.set_ratio_class(i + 1, background)
 
         roc.draw()
@@ -738,7 +780,7 @@ class Results:
     def plot_fraction_scans(
         self,
         suffix: str | None = None,
-        efficiency: float = 0.7,
+        efficiency: float = 0.3,
         rej: bool = False,
         optimal_fc: bool = False,
         backgrounds: list[Flavour] | None = None,
@@ -788,9 +830,20 @@ class Results:
         eff_or_rej = calc_eff if not rej else calc_rej
         colours = get_good_colours()
         for i, tagger in enumerate(self.taggers.values()):
+            # print(tagger)
             xs = np.zeros(len(fxs))
             ys = np.zeros(len(fxs))
-            sig_idx = tagger.is_flav(self.signal)
+            if tagger.ghost:
+                signal = f'ghost{self.signal}'
+                if signal == 'ghostbjets':
+                    backgrounds = [Flavours.ghostcjets, Flavours.ghostujets]
+                elif signal == 'ghostcjets':
+                    backgrounds = [Flavours.ghostbjets, Flavours.ghostujets]
+                frac = "fghostc" if self.signal == Flavours.bjets else "fghostb"
+
+            else:
+                signal = self.signal
+            sig_idx = tagger.is_flav(signal)
             bkg_1_idx = tagger.is_flav(backgrounds[0])
             bkg_2_idx = tagger.is_flav(backgrounds[1])
             for j, fx in enumerate(fxs):
@@ -799,7 +852,12 @@ class Results:
                 ys[j] = eff_or_rej(disc[sig_idx], disc[bkg_2_idx], efficiency)
 
             # add curve for this tagger
-            tagger_fx = tagger.fxs["fc" if self.signal == Flavours.bjets else "fb"]
+            if tagger.ghost:
+                tagger_fx = tagger.fxs["fghostc" if self.signal == Flavours.bjets else "fghostb"]
+            else:
+                tagger_fx = tagger.fxs["fc" if self.signal == Flavours.bjets else "fb"]
+
+
             plot.add(
                 Line2D(
                     x_values=xs,
