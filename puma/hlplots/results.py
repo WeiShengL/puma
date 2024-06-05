@@ -201,20 +201,22 @@ class Results:
             if tagger.ghost:
                 tagger.output_flavours = [Flavours.ghostujets, Flavours.ghostcjets, Flavours.ghosttaujets, Flavours.ghostbjets]
 
-            print(tagger.name)
-            print(tagger.output_flavours)
-            print(tagger.variables)
+            # print(tagger.name)
+            # print(tagger.output_flavours)
+            # print(tagger.variables)
         # get a list of all variables to be loaded from the file
         if not isinstance(cuts, Cuts):
             cuts = Cuts.empty() if cuts is None else Cuts.from_list(cuts)
         # var_list = sum([tagger.variables for tagger in taggers], [label_var])
-        print(tagger.variables)
+        # print(tagger.variables)
         temp_variables = [s+'jets' for s in tagger.variables]
-        print("Temp")
-        print(temp_variables)
+        # print("Temp")
+        # print(temp_variables)
         var_list = sum([tagger.variables + [label_var] if not tagger.ghost else temp_variables + ['GhostTruthLabelID'] for tagger in taggers], [])
         var_list += cuts.variables
         var_list += sum([t.cuts.variables for t in taggers if t.cuts is not None], [])
+        var_list += ["HadronConeExclTruthLabelID"]
+        var_list += ["GhostTruthLabelID"]
         var_list = list(set(var_list + self.perf_vars))
 
         # load data
@@ -542,6 +544,8 @@ class Results:
                 )
 
         # setting which flavour rejection ratio is drawn in which ratio panel
+        print("ratio")
+        print(backgrounds)
         for i, background in enumerate(backgrounds):
             roc.set_ratio_class(i + 1, background)
 
