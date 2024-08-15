@@ -193,8 +193,8 @@ def eff_err(
     logger.debug("n_counts: %i", n_counts)
     logger.debug("suppress_zero_divison_error: %s", suppress_zero_divison_error)
     logger.debug("norm: %s", norm)
-    if np.any(n_counts <= 0) and not suppress_zero_divison_error:
-        raise ValueError(f"You passed as argument `N` {n_counts} but it has to be larger 0.")
+    # if np.any(n_counts <= 0) and not suppress_zero_divison_error:
+    #     raise ValueError(f"You passed as argument `N` {n_counts} but it has to be larger 0.")
     if norm:
         return np.sqrt(arr * (1 - arr) / n_counts) / arr
     return np.sqrt(arr * (1 - arr) / n_counts)
@@ -236,8 +236,8 @@ def rej_err(
     logger.debug("arr: %s", arr)
     logger.debug("n_counts: %i", n_counts)
     logger.debug("norm: %s", norm)
-    if np.any(n_counts <= 0):
-        raise ValueError(f"You passed as argument `n_counts` {n_counts} but it has to be larger 0.")
+    # if np.any(n_counts <= 0):
+    #     raise ValueError(f"You passed as argument `n_counts` {n_counts} but it has to be larger 0.")
     if np.any(arr == 0):
         raise ValueError("One rejection value is 0, cannot calculate error.")
     if norm:

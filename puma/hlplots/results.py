@@ -9,6 +9,9 @@ import numpy as np
 from ftag import Cuts, Flavour, Flavours
 from ftag.hdf5 import H5Reader
 from matplotlib.figure import Figure
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 from puma import (
     Histogram,
@@ -192,7 +195,15 @@ class Results:
             tagger.output_flavours = self.flavours
             if "ftau" in tagger.fxs:
                 tagger.output_flavours += [Flavours.taujets]
-
+        if tagger.ghost:
+            label_var = "HadronGhostTruthLabelID"
+            tagger.labels = "HadronGhostTruthLabelID"
+        elif tagger.fcc:
+            label_var = "flavour"
+            tagger.labels = "flavour"
+        else:
+            label_var = "HadronConeExclTruthLabelID"
+            tagger.labels = "HadronConeExclTruthLabelID"
         # get a list of all variables to be loaded from the file
         if not isinstance(cuts, Cuts):
             cuts = Cuts.empty() if cuts is None else Cuts.from_list(cuts)
@@ -200,6 +211,8 @@ class Results:
         var_list += cuts.variables
         var_list += sum([t.cuts.variables for t in taggers if t.cuts is not None], [])
         var_list = list(set(var_list + self.perf_vars))
+        # var_list += ['HadronGhostTruthLabelDR']
+        print(var_list)
 
         # load data
         reader = H5Reader(file_path, precision="full")
@@ -225,6 +238,9 @@ class Results:
 
             # attach data to tagger objects
             tagger.extract_tagger_scores(sel_data, source_type="structured_array")
+            print(tagger.name)
+            print(label_var)
+
             tagger.labels = np.array(sel_data[label_var], dtype=[(label_var, "i4")])
             if perf_vars is None:
                 tagger.perf_vars = {}
@@ -233,6 +249,7 @@ class Results:
                         tagger.perf_vars[perf_var] = sel_data[perf_var] * 0.001
                     else:
                         tagger.perf_vars[perf_var] = sel_data[perf_var]
+                # tagger.perf_vars['HadronGhostTruthLabelDR'] = sel_data['HadronGhostTruthLabelDR']
             else:
                 tagger.perf_vars = sel_perf_vars
 
@@ -443,6 +460,77 @@ class Results:
         )
         self.save(hist, "disc", suffix=suffix)
 
+
+        # for i, tagger in enumerate(self.taggers.values()):
+        #     if exclude_tagger is not None and tagger.name in exclude_tagger:
+        #         continue
+        #     discs = tagger.discriminant(self.signal)
+        #     # conf_wp_vlines = [60, 70, 77, 85]
+        #     conf_wp_vlines = [10, 20, 30, 40]
+        #     conf_wp_cuts, conf_wp_labels = [], []
+        #     print(self.signal)
+        #     # get working point
+        #     for wp in conf_wp_vlines:
+        #         cut = np.percentile(discs[tagger.is_flav(self.signal)], 100 - wp)
+        #         label = None if i > 0 else f"{wp}%"
+        #         conf_wp_cuts.append(cut)
+        #         conf_wp_labels.append(label)
+
+        #     print(conf_wp_cuts)
+        #     print(conf_wp_labels)
+        #     print(tagger.scores)
+        #     print(discs)
+        #     print(tagger.labels)
+        #     # truth_labels = tagger.labels.flatten()
+        #     truth_labels = np.array([label[0] for label in tagger.labels])
+        #     def classify_jet(disc):
+        #         if disc > conf_wp_cuts[0]:
+        #             # return '0-60%'
+        #             return '0-10%'
+        #         elif disc > conf_wp_cuts[1]:
+        #             # return '60-70%'
+        #             return '10-20%'
+        #         elif disc > conf_wp_cuts[2]:
+        #             # return '70-77%'
+        #             return '20-30%'
+        #         elif disc > conf_wp_cuts[3]:
+        #             # return '77-85%'
+        #             return '30-40%'
+        #         else:
+        #             # return '85%'
+        #             return '40%'
+        #     classified_labels = np.array([classify_jet(disc) for disc in discs])
+        #     # Define the classes
+        #     truth_classes = [5, 4, 0, 15]
+        #     # classified_classes = ['0-60%', '60-70%', '70-77%', '77-85%', '85%']
+        #     classified_classes = ['0-10%', '10-20%', '20-30%', '30-40%', '40%']
+
+        #     # Map the classes to indices
+        #     truth_map = {label: i for i, label in enumerate(truth_classes)}
+        #     classified_map = {label: i for i, label in enumerate(classified_classes)}
+
+        #     # Create an empty confusion matrix
+        #     conf_matrix = np.zeros((len(truth_classes), len(classified_classes)), dtype=int)
+
+        #     # Populate the confusion matrix
+        #     for true_label, classified_label in zip(truth_labels, classified_labels):
+        #         if true_label in truth_map and classified_label in classified_map:
+        #             conf_matrix[truth_map[true_label], classified_map[classified_label]] += 1
+
+
+        #     conf_matrix_normalized = conf_matrix.astype('float') / conf_matrix.sum(axis=1)[:, np.newaxis]
+
+        #     # Plot the confusion matrix
+        #     plt.figure(figsize=(10, 8))
+        #     sns.heatmap(conf_matrix_normalized, annot=True, fmt='.4f', cmap='Blues', 
+        #                 xticklabels=classified_classes, yticklabels=truth_classes)
+        #     plt.xlabel('WP Assignment')
+        #     plt.ylabel('True Class')
+        #     plt.title('Confusion Matrix')
+        #     plt.savefig('/share/rcifdata/wlai/tools/random_tools/random_plots/wp_cm_ghost_norm_zprime.png')
+
+
+
     def plot_rocs(
         self,
         x_range: tuple[float, float] | None = None,
@@ -592,6 +680,9 @@ class Results:
             )
 
         for tagger in self.taggers.values():
+            # if perf_var == 'HadronConeExclTruthLabelDR':
+            #     if tagger.ghost:
+            #         perf_var = 'HadronGhostTruthLabelDR'
             discs = tagger.discriminant(self.signal)
             is_signal = tagger.is_flav(self.signal)
 

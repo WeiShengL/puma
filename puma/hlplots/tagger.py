@@ -44,6 +44,8 @@ class Tagger:
 
     # Used only by YUMA
     yaml_name: str = None
+    ghost: bool = False
+    fcc: bool = False
 
     def __post_init__(self):
         if self.label is None:
@@ -72,6 +74,10 @@ class Tagger:
         np.ndarray
             Array of indices of the given flavour
         """
+        if self.ghost:
+            flavour = f'ghost{flavour}'
+        if self.fcc:
+            flavour = f'fcc_{flavour}'
         flavour = Flavours[flavour]
         return flavour.cuts(self.labels).idx
 
@@ -84,6 +90,10 @@ class Tagger:
         list
             List of probability names
         """
+        if self.ghost:
+            return(['pghost' + flav.px[1:] + 'jets' for flav in self.output_flavours])
+        if self.fcc:
+            return(['pfcc_' + flav.px[1:] + 'jets' for flav in self.output_flavours])
         return [flav.px for flav in self.output_flavours]
 
     @property
@@ -187,6 +197,10 @@ class Tagger:
         int
             Number of jets of given flavour
         """
+        if self.ghost:
+            flavour = f'ghost{flavour}'
+        if self.fcc:
+            flavour = f'fcc_{flavour}'
         flavour = Flavours[flavour]
         return len(flavour.cuts(self.labels).values)
 
@@ -230,7 +244,7 @@ class Tagger:
         if fxs is None:
             fxs = self.fxs
         fxs = {k: v for k, v in fxs.items() if k != signal.frac_str}
-        return get_discriminant(self.scores, self.name, signal, **fxs)
+        return get_discriminant(self.scores, self.name, signal, self.ghost, self.fcc, **fxs)
 
     def vertex_indices(self, incl_vertexing=False):
         """Retrieve cleaned vertex indices for the tagger.
