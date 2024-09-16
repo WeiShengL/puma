@@ -15,72 +15,56 @@ results_config:
     - "eta < 2.5"
     - "eta > -2.5"
     - "n_truth_promptLepton == 0"
+  all_flavours: ["hcc", "top", "qcd"]
+  label_var: R10TruthLabel_R22v1
 
 taggers_config: !include taggers.yaml
 taggers: [dummy1, dummy2, dummy3]
 
 plots:
   roc:
-    - signal: cjets
+    - signal: hbb
       plot_kwargs:
         x_range: [0.5, 1.0]
         figsize: [8.5, 7.5]
 
-    - signal: bjets
-      plot_kwargs:
-        x_range: [0.5, 1.0]
-        figsize: [8.5, 7.5]
-
-    - signal: bjets
+    - signal: hbb
       include_taggers: ["dummy1"]
       plot_kwargs:
         x_range: [0.5, 1.0]
 
-    - signal: bjets
+    - signal: hbb
       exclude_taggers: ["dummy1"]
       plot_kwargs:
         x_range: [0.5, 1.0]
 
-  scan:
-    - signal: bjets
-      plot_kwargs:
-        backgrounds: ['cjets', 'ujets']
-        efficiency: 0.70
-        figsize: [8.5, 7.5]
-
   disc:
-    - signal: bjets
+    - signal: hbb
       plot_kwargs:
         wp_vlines: [70, 77, 80]
 
   probs:
-    - signal: bjets
+    - signal: hbb
 
   peff:
-    - signal: bjets
+    - signal: hbb
       plot_kwargs:
         flat_per_bin: True
         working_point: 0.7
 
-    - signal: bjets
+    - signal: hbb
       plot_kwargs:
         fixed_rejections:
-          cjets: 10
-          ujets: 100
+          hcc: 10
+          htop: 100
 
-    - signal: bjets
+    - signal: hbb
       plot_kwargs:
         flat_per_bin: True
         working_point: 0.7
 
-    - signal: bjets
+    - signal: hbb
       plot_kwargs:
         perf_var: eta
-        flat_per_bin: False
-        working_point: 0.7
-
-    - signal: bjets
-      plot_kwargs:
-        perf_var: HadronConeExclTruthLabelPt
         flat_per_bin: False
         working_point: 0.7

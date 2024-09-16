@@ -37,6 +37,7 @@ class Results:
     signal: Flavour | str
     sample: str
     backgrounds: list = field(init=False)
+    all_flavours: list[Flavour] | None = None
     atlas_first_tag: str = "Simulation Internal"
     atlas_second_tag: str = None
     atlas_third_tag: str = None
@@ -47,8 +48,11 @@ class Results:
     global_cuts: Cuts | list | None = None
     num_jets: int | None = None
     remove_nan: bool = False
+    label_var: str = "HadronConeExclTruthLabelID"
 
     def __post_init__(self):
+        if self.all_flavours:
+            self.all_flavours = [Flavours[f] for f in self.all_flavours]
         self.set_signal(self.signal)
         if isinstance(self.output_dir, str):
             self.output_dir = Path(self.output_dir)
@@ -70,6 +74,10 @@ class Results:
         if isinstance(signal, str):
             signal = Flavours[signal]
         self.signal = signal
+        # If we have a list of al flavours, then the background is always [all - signal]
+        if self.all_flavours:
+            self.backgrounds = [f for f in self.all_flavours if f != self.signal]
+            return
         if self.signal == Flavours.bjets:
             self.backgrounds = [Flavours.cjets, Flavours.ujets]
         elif self.signal == Flavours.cjets:
@@ -134,6 +142,7 @@ class Results:
                 tp,
                 cuts=self.global_cuts,
                 num_jets=self.num_jets,
+                label_var=self.label_var,
             )
 
     def load_taggers_from_file(  # pylint: disable=R0913
@@ -554,6 +563,7 @@ class Results:
         if x_range is None:
             x_range = (0.5, 1.0)
         sig_effs = np.linspace(*x_range, resolution)
+
         roc_plot_args = {
             "n_ratio_panels": len(self.backgrounds),
             "ylabel": "Background rejection",
@@ -855,7 +865,9 @@ class Results:
         if self.signal not in {Flavours.bjets, Flavours.cjets}:
             raise ValueError("Signal flavour must be bjets or cjets")
 
-        backgrounds = backgrounds if backgrounds is not None else self.backgrounds
+        backgrounds = (
+            [Flavours[b] for b in backgrounds] if backgrounds is not None else self.backgrounds
+        )
         if len(backgrounds) != 2:
             raise ValueError("Only two background flavours are supported")
 

@@ -130,8 +130,8 @@ def associate_vertices(test_vertices, ref_vertices, eff_req, purity_req):
     associations[common_tracks == 0] = False  # remove leftover pairs with zero matches
 
     # enforce purity and efficiency requirements
-    eff_cut = common_tracks * inv_ref_size > eff_req
-    purity_cut = common_tracks * inv_test_size > purity_req
+    eff_cut = common_tracks * inv_ref_size >= eff_req
+    purity_cut = common_tracks * inv_test_size >= purity_req
     associations = np.logical_and.reduce((associations, eff_cut, purity_cut))
 
     return associations, common_tracks
@@ -223,14 +223,17 @@ def calculate_vertex_metrics(
         metrics["n_ref"][i] = ref_vertices.shape[0]
         metrics["n_test"][i] = test_vertices.shape[0]
 
+        # only save purity metrics for requested number of vertices
+        max_index = min(metrics["n_match"][i], max_vertices)
+
         # write out vertexing purity metrics
-        metrics["track_overlap"][i, : metrics["n_match"][i]] = common_tracks[associations]
-        metrics["test_vertex_size"][i, : metrics["n_match"][i]] = test_vertices[
+        metrics["track_overlap"][i, :max_index] = common_tracks[associations][:max_index]
+        metrics["test_vertex_size"][i, :max_index] = test_vertices[
             associations.sum(axis=1).astype(bool)
-        ].sum(axis=1)
-        metrics["ref_vertex_size"][i, : metrics["n_match"][i]] = ref_vertices[
+        ].sum(axis=1)[:max_index]
+        metrics["ref_vertex_size"][i, :max_index] = ref_vertices[
             associations.sum(axis=0).astype(bool)
-        ].sum(axis=1)
+        ].sum(axis=1)[:max_index]
 
     return metrics
 
@@ -238,8 +241,8 @@ def calculate_vertex_metrics(
 def clean_truth_vertices(truth_vertices, truth_track_origin, incl_vertexing=False):
     """
     Clean truth vertices for each track in a single jet. This function removes
-    all truth PV, PU and fake tracks from truth vertices. If inclusive vertexing
-    is enabled, it also merges HF tracks into a single vertex.
+    all truth vertices that are not entirely from HF. If inclusive vertexing
+    is enabled, it also merges remaining vertices into a single vertex.
 
     Parameters
     ----------
@@ -255,26 +258,19 @@ def clean_truth_vertices(truth_vertices, truth_track_origin, incl_vertexing=Fals
     truth_vertices: np.ndarray
         Array containing cleaned truth vertex indices for each track in a jet.
     """
-    # clean truth vertex indices - remove indices from true PV, PU, fake
-    truth_removal_cond = np.logical_or(
-        truth_vertices == 0,
-        np.isin(truth_track_origin, [0, 1, 2]),
-    )
+    # remove vertices that aren't purely HF
+    removal_indices = np.unique(truth_vertices[np.isin(truth_track_origin, [3, 4, 5], invert=True)])
     truth_vertices = clean_indices(
         truth_vertices,
-        truth_removal_cond,
+        np.isin(truth_vertices, removal_indices),
         mode="remove",
     )
 
     # merge truth vertices from HF for inclusive performance
     if incl_vertexing:
-        truth_merge_cond = np.logical_and(
-            truth_vertices > 0,
-            np.isin(truth_track_origin, [3, 4, 5]),
-        )
         truth_vertices = clean_indices(
             truth_vertices,
-            truth_merge_cond,
+            truth_vertices > 0,
             mode="merge",
         )
 
@@ -317,17 +313,19 @@ def clean_reco_vertices(reco_vertices, reco_track_origin=None, incl_vertexing=Fa
                 mode="remove",
             )
 
-        # merge vertices with > 0 tracks from HF and remove others
+        # remove vertices with no tracks from HF
+        hf_vertex_indices = np.unique(reco_vertices[np.isin(reco_track_origin, [3, 4, 5])])
+        reco_vertices = clean_indices(
+            reco_vertices,
+            np.isin(reco_vertices, hf_vertex_indices, invert=True),
+            mode="remove",
+        )
+
+        # merge remaining vertices for inclusive performance
         if incl_vertexing:
-            hf_vertex_indices = np.unique(reco_vertices[np.isin(reco_track_origin, [3, 4, 5, 6])])
             reco_vertices = clean_indices(
                 reco_vertices,
-                np.isin(reco_vertices, hf_vertex_indices, invert=True),
-                mode="remove",
-            )
-            reco_vertices = clean_indices(
-                reco_vertices,
-                np.isin(reco_vertices, hf_vertex_indices),
+                reco_vertices >= 0,
                 mode="merge",
             )
 
