@@ -430,6 +430,22 @@ class PlotBase(PlotObject):
     def set_y_lim(self):
         """Set limits of y-axis."""
         ymin, ymax = self.axis_top.get_ylim()
+        # #pt low
+        # ymin = 0.8
+        # ymax = 1.05
+        # # eta low
+        # ymin=0.6
+        # ymax = 1.08
+
+        # roc high
+        # ymin = 0
+        # ymax = 2e6
+        # #pt high
+        # ymin = 0.6
+        # ymax = 1.05
+        # # eta high
+        # ymin=-0.1
+        # ymax = 1.8
         self.axis_top.set_ylim(
             ymin if self.ymin is None else self.ymin,
             ymin + (ymax - ymin) * self.y_scale if self.ymax is None else self.ymax,

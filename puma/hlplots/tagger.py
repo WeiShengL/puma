@@ -92,7 +92,7 @@ class Tagger:
             List of probability names
         """
         if self.ghost:
-            return(['pghost' + flav.px[1:] + 'jets' for flav in self.output_flavours])
+            return(['pghost' + flav.px[1:] for flav in self.output_flavours])
         if self.fcc:
             return(['pfcc_' + flav.px[1:] + 'jets' for flav in self.output_flavours])
         return [flav.px for flav in self.output_flavours]

@@ -213,6 +213,10 @@ class Results:
         else:
             label_var = "HadronConeExclTruthLabelID"
             tagger.labels = "HadronConeExclTruthLabelID"
+        if tagger.fcc and tagger.name == 'GN2_fcchh_II_v4.1':
+            tag = "20 < $p_T$ < 300 GeV, $|\eta| < 6$ "
+            # tag = "300 < $p_T$ < 5000 GeV, $|\eta| < 6$ "
+            self.atlas_second_tag = f"{self.atlas_second_tag}\n{tag}"
         # get a list of all variables to be loaded from the file
         if not isinstance(cuts, Cuts):
             cuts = Cuts.empty() if cuts is None else Cuts.from_list(cuts)
@@ -255,7 +259,10 @@ class Results:
                 tagger.perf_vars = {}
                 for perf_var in self.perf_vars:
                     if any(x in perf_var for x in ["pt", "mass"]):
-                        tagger.perf_vars[perf_var] = sel_data[perf_var] * 0.001
+                        if tagger.fcc:
+                            tagger.perf_vars[perf_var] = sel_data[perf_var]
+                        else:          
+                            tagger.perf_vars[perf_var] = sel_data[perf_var] * 0.001
                     else:
                         tagger.perf_vars[perf_var] = sel_data[perf_var]
                 # tagger.perf_vars['HadronGhostTruthLabelDR'] = sel_data['HadronGhostTruthLabelDR']
@@ -690,9 +697,9 @@ class Results:
             )
 
         for tagger in self.taggers.values():
-            # if perf_var == 'HadronConeExclTruthLabelDR':
-            #     if tagger.ghost:
-            #         perf_var = 'HadronGhostTruthLabelDR'
+            if perf_var == 'HadronConeExclTruthLabelDR':
+                if tagger.ghost:
+                    perf_var = 'HadronGhostTruthLabelDR'
             discs = tagger.discriminant(self.signal)
             is_signal = tagger.is_flav(self.signal)
 
