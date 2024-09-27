@@ -83,6 +83,8 @@ class Results:
             self.backgrounds = [Flavours.hcc, Flavours.top, Flavours.qcd]
         elif self.signal == Flavours.hcc:
             self.backgrounds = [Flavours.hbb, Flavours.top, Flavours.qcd]
+        elif self.signal == Flavours.ghostbjets:
+            self.backgrounds = [Flavours.ghostcjets, Flavours.ghostujets]
         else:
             raise ValueError(f"Unsupported signal class {self.signal}.")
 
